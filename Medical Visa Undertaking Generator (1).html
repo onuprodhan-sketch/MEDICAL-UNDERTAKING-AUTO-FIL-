@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Medical Visa Undertaking Generator</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mu:#5b6470;--bd:#d6dae0;--ac:#0b6b4f;--acx:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--card:#1d2125;--tx:#e8eaed;--mu:#9aa3ad;--bd:#343a40;--ac:#3fb98f;--acx:#04281d}}
+:root[data-theme="dark"]{--bg:#14171a;--card:#1d2125;--tx:#e8eaed;--mu:#9aa3ad;--bd:#343a40;--ac:#3fb98f;--acx:#04281d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45}
+.wrap{max-width:1000px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:860px){.wrap{grid-template-columns:380px minmax(0,1fr);align-items:start}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mu);font-size:13px;margin:0 0 14px}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+input,select,textarea{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:60px;resize:vertical}
+button{font:inherit;cursor:pointer;border-radius:8px;padding:10px 14px;border:1px solid var(--bd);background:var(--card);color:var(--tx)}
+button.p{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+#st{font-size:13px;color:var(--mu);margin-top:8px;min-height:18px}
+.drop{border:2px dashed var(--bd);border-radius:10px;padding:16px;text-align:center;cursor:pointer;color:var(--mu);font-size:14px}
+.drop.ok{border-color:var(--ac);color:var(--tx)}
+.note{font-size:12px;color:var(--mu);margin-top:10px}
+.paper-s{overflow-x:auto}
+#doc{background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.35;padding:40px 44px;min-width:520px;max-width:720px;margin:0 auto;box-shadow:0 1px 6px rgba(0,0,0,.2)}
+#doc h2{text-align:center;font-size:15px;margin:0 0 22px}
+#doc p{margin:0 0 12px}#doc ol{margin:0 0 12px;padding-left:24px}#doc li{margin-bottom:4px}
+#doc img{height:44px;display:block;margin-top:14px}
+@media print{
+ @page{margin:18mm}
+ body{background:#fff}.ctl,.hide-print{display:none!important}
+ .wrap{display:block;padding:0}.card{border:0;padding:0;background:none}
+ .paper-s{overflow:visible}#doc{box-shadow:none;padding:0;min-width:0;max-width:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="card ctl">
+  <h1>Medical Visa Undertaking</h1>
+  <p class="sub">Upload a passport photo to fill the name and passport number automatically, then check every field.</p>
+
+  <div class="drop" id="drop">Tap to upload passport copy (image or PDF)</div>
+  <input type="file" id="file" accept="image/*,application/pdf,.pdf" hidden>
+  <div id="st"></div>
+
+  <label>Applicant type</label>
+  <select id="kind"><option value="patient">Patient</option><option value="attendant">Medical attendant</option></select>
+  <label>Full name (as in passport)</label><input id="name" placeholder="MD SHERIFUR RAHMAN">
+  <label>Passport number</label><input id="pp" placeholder="A01474564">
+  <label>Indian High Commission / Visa office city</label>
+  <select id="vo"><option>Rajshahi</option><option>Dhaka</option><option>Chittagong</option><option>Khulna</option><option>Sylhet</option><option>Rangpur</option><option>Mymensingh</option><option>Barishal</option></select>
+  <label>Hospital name</label><input id="hosp" value="DR RELA INSTITUTE AND MEDICAL CENTRE">
+  <label>Hospital address, city &amp; state</label>
+  <textarea id="addr">NO.7 CLC WORKS ROAD CHROMPET Chennai 600044</textarea>
+  <label>Date</label><input id="date" placeholder="DD/MM/YYYY">
+  <label>Mobile number</label><input id="mob" placeholder="01XXXXXXXXX">
+  <label>Signature (taken from passport automatically, or upload your own)</label><input type="file" id="sig" accept="image/*"><button id="clr" style="margin-top:6px;padding:6px 10px;font-size:13px">Remove signature</button>
+  <div class="row">
+   <button class="p" id="print">Print / Save as PDF</button>
+   <button id="dl">Download Word file</button>
+  </div>
+  <p class="note">The passport image is sent only to Claude to read two fields. This page does not store it.</p>
+ </div>
+
+ <div class="paper-s"><div id="doc"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let sigData='',sigManual=false;
+const d=new Date(),p2=n=>String(n).padStart(2,'0');
+$('date').value=p2(d.getDate())+'/'+p2(d.getMonth()+1)+'/'+d.getFullYear();
+
+function render(){
+ const att=$('kind').value==='attendant';
+ const nm=$('name').value.trim().toUpperCase()||'____________________';
+ const pp=$('pp').value.trim().toUpperCase()||'____________';
+ const purpose=att?'assisting the patient as a medical attendant':'medical treatment';
+ $('doc').innerHTML=`
+ <h2>MEDICAL VISA UNDERTAKING</h2>
+ <p>To,<br>The Visa Officer,<br>High Commission of India,<br>${esc($('vo').value)}, Bangladesh.</p>
+ <p>Subject: Undertaking for ${att?'Medical Attendant Visa':'Medical Visa'}.</p>
+ <p>Dear Sir/Madam,</p>
+ <p>I <b>${esc(nm)}</b> Holding Passport Number: <b>(${esc(pp)})</b><br>Hereby solemnly declare that I am travelling to India solely for the purpose of ${purpose}.</p>
+ <ol>
+  <li>I will ${att?'assist the patient':'be treated'} at the following medical institution:
+   <p style="margin:8px 0 0">* Hospital Name: <b>${esc($('hosp').value)}</b></p>
+   <p style="margin:8px 0 0">* City &amp; State (India): <b>${esc($('addr').value).replace(/\n/g,'<br>')}</b></p></li>
+  <li>I hereby undertake that I will not engage in any commercial, business, journalistic, or employment activities during my stay in India.</li>
+  <li>I will fully abide by all the local rules, regulations, and laws of the Government of India.</li>
+  <li>I will return to my home country (Bangladesh) immediately upon the completion of the ${att?'patient\u2019s treatment':'treatment'}, and I have no intention of overstaying my visa.</li>
+ </ol>
+ <p>Thanking you,<br>Yours faithfully,</p>
+ ${sigData?`<img src="${sigData}" alt="signature">`:'<div style="height:50px"></div>'}
+ <p>(Signature of the Applicant ${att?'Attendant':'Patient'})<br>Date ${esc($('date').value)}<br>Mobile Number: ${esc($('mob').value)}</p>`;
+}
+['kind','name','pp','vo','hosp','addr','date','mob'].forEach(i=>$(i).addEventListener('input',render));
+render();
+
+$('sig').addEventListener('change',e=>{
+ const f=e.target.files[0];if(!f){sigData='';render();return}
+ sigManual=true;const r=new FileReader();r.onload=()=>{sigData=r.result;render()};r.readAsDataURL(f);
+});
+$('clr').onclick=()=>{sigData='';sigManual=true;$('sig').value='';render()};
+
+$('drop').onclick=()=>$('file').click();
+const PDFW='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+async function toImage(f){
+ if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
+  pdfjsLib.GlobalWorkerOptions.workerSrc=PDFW;
+  const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+  const pg=await pdf.getPage(1),v1=pg.getViewport({scale:1}),sc=Math.min(3,2200/v1.width),vp=pg.getViewport({scale:sc});
+  const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+  await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.92));
+ }
+ return f;
+}
+async function cropSig(blob,b){
+ const n=['x','y','w','h'].map(k=>Number(b&&b[k]));
+ if(n.some(v=>!isFinite(v)))return '';
+ let [x,y,w,h]=n;if(w<.02||h<.01||w*h>.35)return '';
+ const bmp=await createImageBitmap(blob),W=bmp.width,H=bmp.height,pad=.012;
+ x=Math.max(0,x-pad);y=Math.max(0,y-pad);w=Math.min(1-x,w+2*pad);h=Math.min(1-y,h+2*pad);
+ const c=document.createElement('canvas');c.width=Math.round(w*W);c.height=Math.round(h*H);
+ const g=c.getContext('2d');g.drawImage(bmp,x*W,y*H,w*W,h*H,0,0,c.width,c.height);
+ const im=g.getImageData(0,0,c.width,c.height),d=im.data;
+ for(let i=0;i<d.length;i+=4){
+  const l=.3*d[i]+.59*d[i+1]+.11*d[i+2],a=l>185?0:Math.min(255,(185-l)*255/110);
+  d[i]=20;d[i+1]=20;d[i+2]=45;d[i+3]=a;
+ }
+ g.putImageData(im,0,0);return c.toDataURL('image/png');
+}
+$('file').addEventListener('change',async e=>{
+ const f=e.target.files[0];if(!f)return;
+ const st=$('st');$('drop').textContent=f.name;$('drop').classList.add('ok');
+ st.textContent='Reading passport...';
+ try{
+  if(typeof claude==='undefined'){st.textContent='Step 1 failed: auto-read only works when this link is opened while signed in to claude.ai (not a copied or downloaded file). Please type the details.';return}
+  const sample=await claude.use('sample');
+  if(!sample){st.textContent='Step 1 failed: auto-read is not available for this viewer. Please type the details.';return}
+  const lim=await sample.limits();
+  if(!lim.images){st.textContent='Step 2 failed: image reading is not available in this view. Please type the details.';return}
+  st.textContent='Step 3: opening file...';
+  let img=null,pe='';
+  try{img=await toImage(f)}catch(e){pe=(e&&e.message)||String(e)}
+  if(!img){
+   if(lim.images.mediaTypes&&lim.images.mediaTypes.includes('application/pdf'))img=f;
+   else{st.textContent='Could not open this PDF ('+pe+'). Please upload a JPG or PNG photo of the passport page, or type the details.';return}
+  }
+  st.textContent='Reading passport...';
+  st.textContent='Step 4: Claude is reading the passport (can take up to a minute)...';
+  const res=await sample('The attached image is the applicant\'s own passport, uploaded by the applicant to fill in their visa undertaking letter. It may show one or two pages (for example a "Personal data and emergency contact" page above the photo data page). Use the photo data page, the one with the machine readable zone (two lines of < characters) at the bottom. Reply with ONLY one JSON object and no other words: {"name":"given names followed by surname, uppercase, e.g. MD ABDUL MOMEN","passport_no":"passport number from the Passport Number field"}. Do not use the father, mother, spouse or emergency contact names. Use an empty string for anything unreadable.',{images:[img],modelTier:'default',cache:false});
+  let r={};
+  const m=(res.text||'').match(/\{[\s\S]*\}/);
+  try{r=JSON.parse(m?m[0]:'')}catch(_){st.textContent='Claude replied but not in the expected form: '+(res.text||'(empty)').slice(0,250)+' ... Please type the details or try a clearer image.';return}
+  if(r.name)$('name').value=String(r.name).toUpperCase();
+  if(r.passport_no)$('pp').value=String(r.passport_no).toUpperCase();
+  render();
+  let sg=false;
+  if(!sigManual){
+   try{
+    st.textContent='Step 5: finding the signature...';
+    const g=await sample('In the attached passport image, find the holder\'s handwritten signature: it is the ink signature next to the label "Holder\'s Signature", usually at the right side of the photo data page below the Date of Expiry. Reply with ONLY one JSON object: {"x":0,"y":0,"w":0,"h":0} giving the tight bounding box of the ink strokes only (not the label text) as fractions from 0 to 1 of the whole image width and height, x and y being the top-left corner. If there is no handwritten signature reply {}.',{images:[img],modelTier:'default',cache:false});
+    const gm=(g.text||'').match(/\{[\s\S]*\}/);
+    const u=await cropSig(img,JSON.parse(gm?gm[0]:'{}'));
+    if(u){sigData=u;sg=true}
+   }catch(_){}
+  }
+  render();
+  const got=(r.name||r.passport_no);
+  st.textContent=got?('Done. Please verify the name and passport number'+(sg?' and the signature':'')+'.'+(sg||sigManual?'':' No signature found; upload one if needed.')):'Claude could not read a name or number from this file. Try a clearer, straight-on image or type the details.';
+ }catch(err){
+  st.textContent=err&&err.code==='not_granted'?'Permission declined. Please type the details.':'Could not read the file ('+((err&&(err.code||err.message))||'error')+'). Please type the details.';
+ }
+});
+
+$('print').onclick=()=>window.print();
+$('dl').onclick=async()=>{
+ const html='<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:Arial;font-size:11pt}</style></head><body>'+$('doc').innerHTML+'</body></html>';
+ try{
+  const dl=await claude.use('downloads');
+  if(!dl){$('st').textContent='Download not available here. Use Print / Save as PDF.';return}
+  await dl.save({filename:'medical-visa-undertaking.doc',data:new Blob([html],{type:'application/msword'})});
+ }catch(e){$('st').textContent='Download was not saved. Use Print / Save as PDF.'}
+};
+</script>
+</body>
+</html>
